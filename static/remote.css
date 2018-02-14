@@ -1,0 +1,16 @@
+* {
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+.range-slider .input-range {
+    -webkit-appearance: slider-vertical;
+    width: 16px;
+    height: 200px;
+    padding: 0 5px;
+    border-radius: 5px;
+    background: #ccc;
+    outline: none;
+}
+
