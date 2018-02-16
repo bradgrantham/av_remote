@@ -103,13 +103,16 @@ def root():
 
 @app.route("/status", methods=['GET'])
 def get_status():
-    log(INFO, "GET status " + what)
+    log(INFO, "GET status")
 
     return json.dumps(get_current_status())
 
 
 @app.route("/set/<what>", methods=['PUT'])
 def set_value(what):
+
+    global current_volume
+
     log(INFO, "PUT set " + what)
     log(INFO, "json " + flask.request.data)
 
@@ -120,7 +123,7 @@ def set_value(what):
         fail(400, WARNING, "volume info couldn't be decoded as JSON")
 
     if what == 'volume':
-        print "volume to " + set_info['value']
+        current_volume = int(set_info['value']) # set volume and verify it on receiver
     else:
         fail(400, WARNING, "unknown thing " + what + " in set value")
 
