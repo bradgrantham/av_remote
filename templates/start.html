@@ -57,6 +57,27 @@ function set_volume(value)
         }
     });
 }
+
+function update_status()
+{
+    $.ajax({
+        type:"GET",
+        beforeSend: function (request)
+        {
+            //request.setRequestHeader("Authority", authorizationToken);
+            request.setRequestHeader("Content-type","application/json");
+            request.setRequestHeader("Accept","application/json");
+        },
+        url: /* APP.event_base_url + */ "status",
+        processData: false,
+        success: function(data, status, xhr) {
+            var av_status = JSON.parse(data);
+
+            set_interface_from_status(av_status);
+        }
+    });
+}
+    
     
 volume_slider.on('input', function(){
     console.log("set volume " + this.value);
@@ -68,6 +89,8 @@ var startup_status_json = '{{ startup_status|safe }}';
 var startup_status = JSON.parse(startup_status_json);
 
 set_interface_from_status(startup_status);
+
+setInterval(update_status, 1000);
 
 // -->
 </script>
