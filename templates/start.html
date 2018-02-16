@@ -10,7 +10,7 @@
 <tr>
 <td>
 <div class="range-slider">
-<input class="input-range" orient="vertical" type="range" step="1" value="50" min="1" max="100">
+<input id="volume-slider" class="input-range" orient="vertical" type="range" step="1" value="25" min="1" max="100">
 </div>
 </td>
 <td>
@@ -32,7 +32,12 @@
 <!--
 'use strict';
 
-var range = $('.input-range');
+var volume_slider = $('#volume-slider');
+
+function set_interface_from_status(status)
+{
+    volume_slider.val(status['volume']);
+}
 
 function set_volume(value)
 {
@@ -53,10 +58,16 @@ function set_volume(value)
     });
 }
     
-range.on('input', function(){
+volume_slider.on('input', function(){
     console.log("set volume " + this.value);
     set_volume(this.value);
 });
+
+var startup_status_json = '{{ startup_status|safe }}';
+
+var startup_status = JSON.parse(startup_status_json);
+
+set_interface_from_status(startup_status);
 
 // -->
 </script>
