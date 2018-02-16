@@ -11,6 +11,32 @@ logfilename = os.environ.get('LOG_NAME', "log.txt")
 logfile = open(logfilename, "w", 0)
 loglock = threading.Lock()
 
+mode_string_to_id = {
+    "ChromeCast Audio" : 0,
+    "ChromeCast Video" : 1,
+    "Table HDMI" : 2,
+    "FM Radio" : 3,
+};
+
+mode_id_to_string = {}
+
+for (name, id) in mode_string_to_id.iteritems():
+    mode_id_to_string[id] = name
+
+current_mode = 2; # XXX mockup
+current_volume = 50;
+current_video_power = True;
+current_receiver_power = True;
+    
+def get_current_status():
+    status = {
+        "volume" : current_volume,
+        "video" : current_video_power,
+        "receiver" : current_receiver_power,
+        "mode" : current_mode,
+    }
+    return status
+
 
 #############################################################################
 # datetime utility
@@ -66,13 +92,20 @@ app = flask.Flask(__name__)
 @app.route("/", methods=['GET'])
 def root():
     vars = {
-        # "event_url": flask.url_for('event_create', _external = True),
+        "startup_status": json.dumps(get_current_status()),
         # "start_url": flask.url_for('start', _external = True),
         # "test_mode" : test_mode,
         # "offline_mode" : offline_mode,
     }
     content = flask.render_template("start.html", **vars)
     return content.replace("APP.mockup = true", "APP.mockup = false")
+
+
+@app.route("/status", methods=['GET'])
+def get_status():
+    log(INFO, "GET status " + what)
+
+    return json.dumps(get_current_status())
 
 
 @app.route("/set/<what>", methods=['PUT'])
