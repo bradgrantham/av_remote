@@ -1,4 +1,5 @@
 import flask
+import traceback
 import json
 import datetime
 import os
@@ -11,12 +12,21 @@ logfilename = os.environ.get('LOG_NAME', "log.txt")
 logfile = open(logfilename, "w", 0)
 loglock = threading.Lock()
 
+power_to_bool = {
+    "off" : False,
+    "on" : True,
+}
+bool_to_power = {
+    False: "off",
+    True: "on",
+}
+
 mode_string_to_id = {
     "ChromeCast Audio" : 0,
     "ChromeCast Video" : 1,
     "Table HDMI" : 2,
     "FM Radio" : 3,
-};
+}
 
 mode_id_to_string = {}
 
@@ -27,13 +37,15 @@ current_mode = 2; # XXX mockup
 current_volume = 50;
 current_video_power = True;
 current_receiver_power = True;
+current_muting = False; # XXX special value overrides volume...?
     
 def get_current_status():
     status = {
         "volume" : current_volume,
-        "video" : current_video_power,
-        "receiver" : current_receiver_power,
-        "mode" : current_mode,
+        "video_power" : bool_to_power[current_video_power],
+        "receiver_power" : bool_to_power[current_receiver_power],
+        "muting" : bool_to_power[current_muting],
+        "mode" : mode_id_to_string[current_mode],
     }
     return status
 
@@ -112,6 +124,10 @@ def get_status():
 def set_value(what):
 
     global current_volume
+    global current_muting
+    global current_video_power
+    global current_receiver_power
+    global current_mode
 
     log(INFO, "PUT set " + what)
     log(INFO, "json " + flask.request.data)
@@ -122,12 +138,27 @@ def set_value(what):
         log(DEBUG, flask.request.data)
         fail(400, WARNING, "volume info couldn't be decoded as JSON")
 
+    value = set_info['value']
+
     if what == 'volume':
-        current_volume = int(set_info['value']) # set volume and verify it on receiver
+        current_volume = int(value)
+        # set volume and verify it on receiver
+    elif what == 'muting':
+        current_muting = power_to_bool[value]
+        # XXX set muting
+    elif what == 'video_power':
+        current_video_power = power_to_bool[value]
+        # XXX set video power
+    elif what == 'receiver_power':
+        current_receiver_power = power_to_bool[value]
+        # XXX set receiver power
+    elif what == 'mode':
+        current_mode = mode_string_to_id[value]
+        # XXX set video power
     else:
         fail(400, WARNING, "unknown thing " + what + " in set value")
 
-    return json.dumps({'success':True})
+    return json.dumps(get_current_status())
 
 
 def shutdown_server():
