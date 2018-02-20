@@ -7,6 +7,7 @@ import threading
 import subprocess
 import socket
 import errno
+import eiscp
 
 logfilename = os.environ.get('LOG_NAME', "log.txt")
 logfile = open(logfilename, "w", 0)
@@ -38,6 +39,21 @@ current_volume = 50;
 current_video_power = True;
 current_receiver_power = True;
 current_muting = False; # XXX special value overrides volume...?
+
+# These are the Onkyo numbers on the display that correspond to min and max.
+receiver_volume_min = 0
+receiver_volume_max = 50
+receiver_volume_range = receiver_volume_max - receiver_volume_min
+
+receiver = eiscp.eISCP("192.168.1.19")
+system_power = receiver.command("system-power=query")
+current_video_power = (system_power[1] == 'on')
+system_volume = receiver.command("volume=query")
+current_volume = (system_volume[1] - receiver_volume_min) * 100 / receiver_volume_range
+
+def set_volume(value):
+    volume = value * receiver_volume_range / 100 + receiver_volume_min
+    receiver.command("volume=%d" % volume)
     
 def get_current_status():
     status = {
@@ -142,6 +158,7 @@ def set_value(what):
 
     if what == 'volume':
         current_volume = int(value)
+        set_volume(current_volume)
         # set volume and verify it on receiver
     elif what == 'muting':
         current_muting = power_to_bool[value]
