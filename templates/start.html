@@ -39,15 +39,26 @@
 var volume_slider = $('#volume-slider');
 var mute_button = $("#mute_button");
 
-function set_interface_from_status(status)
+function set_volume_slider(volume)
 {
-    volume_slider.val(status['volume']);
-    var is_muted = !(status['muting'] === 'off');
-    mute_button.html(is_muted ? "Unmute" : " Mute ");
+    volume_slider.val(volume);
+}
+
+function set_mute_button(is_muted)
+{
+    mute_button.html(is_muted ? "Unmute" : "Mute");
     if(is_muted)
         volume_slider.attr("disabled", "disabled");
     else
         volume_slider.removeAttr("disabled");
+}
+
+function set_interface_from_status(status)
+{
+    set_volume_slider(status['volume']);
+
+    var is_muted = !(status['muting'] === 'off');
+    set_mute_button(is_muted)
 }
 
 function set_param(thing, value)
@@ -101,6 +112,7 @@ mute_button.on('click', function(){
     var want_muting = !is_muting
     console.log("set muting " + want_muting);
     set_param('muting', want_muting ? "on" : "off")
+    set_mute_button(want_muting);
 });
 
 var startup_status_json = '{{ startup_status|safe }}';
