@@ -9,14 +9,18 @@
 <table>
 <tr>
 <td>
+<center>
 <div class="range-slider">
 <input id="volume-slider" class="input-range" orient="vertical" type="range" step="1" value="25" min="1" max="100">
 </div>
+</center>
+<br>
+<button id="mute_button">Mute</button><br>
 </td>
 <td>
 <center>
-<button id="mute_button">Mute</button><br>
-<button id="video_power">LCDs On</button><br>
+<button id="receiver_power">A/V System On</button><br>
+<button id="video_power">Video Monitors On</button><br>
 <hr>
 <button id="mode_fm_button">FM Radio</button><br>
 <button id="mode_cast_button">ChromeCast Video</button><br>
@@ -39,7 +43,11 @@ function set_interface_from_status(status)
 {
     volume_slider.val(status['volume']);
     var is_muted = !(status['muting'] === 'off');
-    mute_button.html(is_muted ? "Unmute" : "Mute");
+    mute_button.html(is_muted ? "Unmute" : " Mute ");
+    if(is_muted)
+        volume_slider.attr("disabled", "disabled");
+    else
+        volume_slider.removeAttr("disabled");
 }
 
 function set_param(thing, value)

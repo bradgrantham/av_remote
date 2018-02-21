@@ -13,6 +13,8 @@ logfilename = os.environ.get('LOG_NAME', "log.txt")
 logfile = open(logfilename, "w", 0)
 loglock = threading.Lock()
 
+schedule_lock = threading.Lock()
+
 power_to_bool = {
     "off" : False,
     "on" : True,
@@ -34,9 +36,8 @@ mode_id_to_string = {}
 for (name, id) in mode_string_to_id.iteritems():
     mode_id_to_string[id] = name
 
+# XXX mockup
 current_mode = 2; # XXX mockup
-current_volume = 50;
-current_video_power = True;
 current_receiver_power = True;
 current_muting = False; # XXX special value overrides volume...?
 
@@ -45,15 +46,42 @@ receiver_volume_min = 0
 receiver_volume_max = 50
 receiver_volume_range = receiver_volume_max - receiver_volume_min
 
-receiver = eiscp.eISCP("192.168.1.19")
-system_power = receiver.command("system-power=query")
-current_video_power = (system_power[1] == 'on')
-system_volume = receiver.command("volume=query")
-current_volume = (system_volume[1] - receiver_volume_min) * 100 / receiver_volume_range
+# populate current state from A/V receiver
+receiver = eiscp.eISCP("192.168.1.151")
+system_power_query = receiver.command("system-power=query")
+current_video_power = (system_power_query[1] == 'on')
+audio_muting_query = receiver.command("audio-muting=query")
+current_muting = (audio_muting_query[1] == 'on')
+system_volume_query = receiver.command("volume=query")
+current_volume = (system_volume_query[1] - receiver_volume_min) * 100 / receiver_volume_range
+
+send_volume_scheduled = False
+
+def send_volume():
+    global current_volume
+    global send_volume_scheduled
+    with schedule_lock:
+        volume = current_volume * receiver_volume_range / 100 + receiver_volume_min
+        print "actually sent volume %d " % current_volume
+        receiver.command("volume=%d" % volume)
+        send_volume_scheduled = False
+
+def set_muting(value):
+    global current_muting
+    current_muting = value
+    print "audio-muting=%s" % bool_to_power[value]
+    receiver.command("audio-muting=%s" % bool_to_power[value])
 
 def set_volume(value):
-    volume = value * receiver_volume_range / 100 + receiver_volume_min
-    receiver.command("volume=%d" % volume)
+    global current_volume
+    global send_volume_scheduled
+    print "set volume to %d and requested send" % value
+    with schedule_lock:
+        current_volume = value
+        if not send_volume_scheduled:
+            send_volume_scheduled = True
+            t = threading.Timer(0.1, send_volume)
+            t.start()
     
 def get_current_status():
     status = {
@@ -139,7 +167,6 @@ def get_status():
 @app.route("/set/<what>", methods=['PUT'])
 def set_value(what):
 
-    global current_volume
     global current_muting
     global current_video_power
     global current_receiver_power
@@ -157,21 +184,20 @@ def set_value(what):
     value = set_info['value']
 
     if what == 'volume':
-        current_volume = int(value)
-        set_volume(current_volume)
+        set_volume(int(value))
         # set volume and verify it on receiver
     elif what == 'muting':
-        current_muting = power_to_bool[value]
-        # XXX set muting
+        set_muting(power_to_bool[value])
+        # XXX set muting, scheduled?
     elif what == 'video_power':
         current_video_power = power_to_bool[value]
-        # XXX set video power
+        # XXX set video power, scheduled?
     elif what == 'receiver_power':
         current_receiver_power = power_to_bool[value]
-        # XXX set receiver power
+        # XXX set receiver power, scheduled?
     elif what == 'mode':
         current_mode = mode_string_to_id[value]
-        # XXX set video power
+        # XXX set video power, scheduled?
     else:
         fail(400, WARNING, "unknown thing " + what + " in set value")
 
