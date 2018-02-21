@@ -14,6 +14,7 @@ logfile = open(logfilename, "w", 0)
 loglock = threading.Lock()
 
 schedule_lock = threading.Lock()
+eiscp_lock = threading.Lock()
 
 power_to_bool = {
     "off" : False,
@@ -46,14 +47,27 @@ receiver_volume_min = 0
 receiver_volume_max = 50
 receiver_volume_range = receiver_volume_max - receiver_volume_min
 
+
 # populate current state from A/V receiver
 receiver = eiscp.eISCP("192.168.1.151")
-system_power_query = receiver.command("system-power=query")
-current_video_power = (system_power_query[1] == 'on')
-audio_muting_query = receiver.command("audio-muting=query")
-current_muting = (audio_muting_query[1] == 'on')
-system_volume_query = receiver.command("volume=query")
-current_volume = (system_volume_query[1] - receiver_volume_min) * 100 / receiver_volume_range
+
+def get_receiver_state():
+    global current_video_power
+    global current_receiver_power
+    global current_volume
+    global current_muting
+    global current_mode
+    with eiscp_lock:
+        system_power_query = receiver.command("system-power=query")
+    current_video_power = (system_power_query[1] == 'on')
+    with eiscp_lock:
+        audio_muting_query = receiver.command("audio-muting=query")
+    current_muting = (audio_muting_query[1] == 'on')
+    with eiscp_lock:
+        system_volume_query = receiver.command("volume=query")
+    current_volume = (system_volume_query[1] - receiver_volume_min) * 100 / receiver_volume_range
+
+get_receiver_state()
 
 send_volume_scheduled = False
 
@@ -63,14 +77,16 @@ def send_volume():
     with schedule_lock:
         volume = current_volume * receiver_volume_range / 100 + receiver_volume_min
         print "actually sent volume %d " % current_volume
-        receiver.command("volume=%d" % volume)
+        with eiscp_lock:
+            receiver.command("volume=%d" % volume)
         send_volume_scheduled = False
 
 def set_muting(value):
     global current_muting
     current_muting = value
     print "audio-muting=%s" % bool_to_power[value]
-    receiver.command("audio-muting=%s" % bool_to_power[value])
+    with eiscp_lock:
+        receiver.command("audio-muting=%s" % bool_to_power[value])
 
 def set_volume(value):
     global current_volume
@@ -84,6 +100,7 @@ def set_volume(value):
             t.start()
     
 def get_current_status():
+    get_receiver_state()
     status = {
         "volume" : current_volume,
         "video_power" : bool_to_power[current_video_power],
