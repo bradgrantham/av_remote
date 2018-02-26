@@ -1,6 +1,6 @@
-mute
+To shutdown server (otherwise threads persist):
+    curl -d '{}' -H "Content-Type: application/json" -X POST http://localhost:5060/shutdown
+
 input selection
-disable volume, mute, and input selectors on power off
-enable volume, mute, and input selectors on power on
 video power
 mobile stylesheet
