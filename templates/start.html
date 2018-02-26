@@ -25,9 +25,10 @@ Volume
 <button id="video_power_button">Video Monitors On</button><br>
 <hr>
 <button id="mode_fm_button">FM Radio</button><br>
-<button id="mode_cast_button">ChromeCast Video</button><br>
+<button id="mode_castvideo_button">ChromeCast Video</button><br>
 <button id="mode_castaudio_button">ChromeCast Audio</button><br>
 <button id="mode_table_button">Table HDMI</button><br>
+<button id="mode_bluetooth_button">Bluetooth</button><br>
 </center>
 </td>
 </tr>
@@ -42,16 +43,17 @@ var volume_slider = $('#volume-slider');
 var mute_button = $("#mute_button");
 var receiver_power_button = $("#receiver_power_button");
 var mode_fm_button = $("#mode_fm_button");
-var mode_cast_button = $("#mode_cast_button");
+var mode_castvideo_button = $("#mode_castvideo_button");
 var mode_castaudio_button = $("#mode_castaudio_button");
 var mode_table_button = $("#mode_table_button");
+var mode_bluetooth_button = $("#mode_bluetooth_button");
 
 function set_volume_slider(volume)
 {
     volume_slider.val(volume);
 }
 
-function set_disabled()
+function set_disabled(input_mode)
 {
     var is_receiver_powered = (receiver_power_button.html() === "A/V System Off");
     var is_muted = !(mute_button.html() === "Mute");
@@ -66,17 +68,35 @@ function set_disabled()
 
         mute_button.removeAttr("disabled");
         mode_fm_button.removeAttr("disabled");
-        mode_cast_button.removeAttr("disabled");
+        mode_castvideo_button.removeAttr("disabled");
         mode_castaudio_button.removeAttr("disabled");
         mode_table_button.removeAttr("disabled");
+        mode_bluetooth_button.removeAttr("disabled");
+
+// "ChromeCast Audio" : 0,
+// "ChromeCast Video" : 1,
+// "Table HDMI" : 2,
+// "FM Radio" : 3,
+// "Bluetooth" : 4,
+        if(input_mode == "ChromeCast Audio")
+            mode_castaudio_button.attr("disabled", "disabled");
+        else if(input_mode == "ChromeCast Video")
+            mode_castvideo_button.attr("disabled", "disabled");
+        else if(input_mode == "Table HDMI")
+            mode_table_button.attr("disabled", "disabled");
+        else if(input_mode == "Bluetooth")
+            mode_bluetooth_button.attr("disabled", "disabled");
+        else if(input_mode == "FM Radio")
+            mode_fm_button.attr("disabled", "disabled");
 
     } else {
 
         mute_button.attr("disabled", "disabled");
         mode_fm_button.attr("disabled", "disabled");
-        mode_cast_button.attr("disabled", "disabled");
+        mode_castvideo_button.attr("disabled", "disabled");
         mode_castaudio_button.attr("disabled", "disabled");
         mode_table_button.attr("disabled", "disabled");
+        mode_bluetooth_button.attr("disabled", "disabled");
     }
 }
 
@@ -84,14 +104,12 @@ function set_mute_button(is_muted)
 {
     // The button requests the opposite of the current state 
     mute_button.html(is_muted ? "Unmute" : "Mute");
-    set_disabled();
 }
 
 function set_receiver_power_button(is_powered)
 {
     // The button requests the opposite of the current state 
     receiver_power_button.html(is_powered ? "A/V System Off" : "A/V System On");
-    set_disabled();
 }
 
 function set_interface_from_status(status)
@@ -103,6 +121,9 @@ function set_interface_from_status(status)
 
     var is_receiver_powered = (status['receiver_power'] === 'on');
     set_receiver_power_button(is_receiver_powered)
+
+    console.log(status['mode']);
+    set_disabled(status['mode']);
 }
 
 function set_param(thing, value)
@@ -165,6 +186,52 @@ receiver_power_button.on('click', function(){
     console.log("set A/V power " + want_power);
     set_param('receiver_power', want_power ? "on" : "off")
     set_receiver_power_button(want_power);
+});
+
+// "ChromeCast Audio" : 0,
+// "ChromeCast Video" : 1,
+// "Table HDMI" : 2,
+// "FM Radio" : 3,
+// "Bluetooth" : 4,
+// var mode_fm_button = $("#mode_fm_button");
+// var mode_castvideo_button = $("#mode_castvideo_button");
+// var mode_castaudio_button = $("#mode_castaudio_button");
+// var mode_table_button = $("#mode_table_button");
+// var mode_bluetooth_button = $("#mode_bluetooth_button");
+
+mode_fm_button.on('click', function(){
+    var s = "FM Radio";
+    console.log("set mode " + s);
+    set_param('mode', s);
+    set_disabled(s);
+});
+
+mode_bluetooth_button.on('click', function(){
+    var s = "Bluetooth";
+    console.log("set mode " + s);
+    set_param('mode', s);
+    set_disabled(s);
+});
+
+mode_table_button.on('click', function(){
+    var s = "Table HDMI";
+    console.log("set mode " + s);
+    set_param('mode', s);
+    set_disabled(s);
+});
+
+mode_castaudio_button.on('click', function(){
+    var s = 'ChromeCast Audio';
+    console.log("set mode " + s);
+    set_param('mode', s);
+    set_disabled(s);
+});
+
+mode_castvideo_button.on('click', function(){
+    var s = 'ChromeCast Video';
+    console.log("set mode " + s);
+    set_param('mode', s)
+    set_disabled(s)
 });
 
 var startup_status_json = '{{ startup_status|safe }}';

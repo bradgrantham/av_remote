@@ -27,19 +27,32 @@ bool_to_power = {
     True: "on",
 }
 
+receiver_input_to_id = {
+    "video2,cbl,sat" : 0,
+    "dvd,bd,dvd" : 1,
+    "video3,game/tv,game,game1" : 2,
+    "fm" : 3,
+    "bluetooth" : 4,
+}
+
 mode_string_to_id = {
     "ChromeCast Audio" : 0,
     "ChromeCast Video" : 1,
     "Table HDMI" : 2,
     "FM Radio" : 3,
+    "Bluetooth" : 4,
+    "Other" : 5,
 }
 
 mode_id_to_string = {}
+mode_id_to_receiver_input = {}
 
 for (name, id) in mode_string_to_id.iteritems():
     mode_id_to_string[id] = name
 
-current_mode = 2 # XXX mockup
+for (input, id) in receiver_input_to_id.iteritems():
+    mode_id_to_receiver_input[id] = input
+
 current_video_power = True # XXX mockup
 
 # These are the Onkyo numbers on the display that correspond to min and max.
@@ -61,9 +74,15 @@ def get_receiver_state():
         system_power_query = receiver.command("system-power=query")
         audio_muting_query = receiver.command("audio-muting=query")
         system_volume_query = receiver.command("volume=query")
+        input_selector_query = receiver.command("input-selector=query")
 
     current_receiver_power = (system_power_query[1] == 'on')
     current_muting = (audio_muting_query[1] == 'on')
+    if isinstance(input_selector_query[1], tuple):
+        input_selector_string = ",".join(input_selector_query[1])
+    else:
+        input_selector_string = input_selector_query[1]
+    current_mode = receiver_input_to_id.get(input_selector_string, 5)
     current_volume = (system_volume_query[1] - receiver_volume_min) * 100 / receiver_volume_range
 
 get_receiver_state()
@@ -80,6 +99,14 @@ def send_volume():
         with eiscp_lock:
             receiver.command(command)
         send_volume_scheduled = False
+
+def set_receiver_input(id):
+    global current_mode
+    current_mode = id
+    command = "input-selector=%s" % mode_id_to_receiver_input[id]
+    print command
+    with eiscp_lock:
+        receiver.command(command)
 
 def set_receiver_power(value):
     global current_receiver_power
@@ -219,9 +246,10 @@ def set_value(what):
     elif what == 'receiver_power':
         set_receiver_power(power_to_bool[value])
     elif what == 'mode':
-        pass
-        # current_mode = mode_string_to_id[value]
-        # XXX set mode
+        if value not in mode_string_to_id:
+            fail(400, WARNING, "unknown input mode " + value + " in set value")
+        else:
+            set_receiver_input(mode_string_to_id[value])
     else:
         fail(400, WARNING, "unknown thing " + what + " in set value")
 
