@@ -11,16 +11,18 @@
 <td>
 <center>
 <div class="range-slider">
+Volume
+<br>
 <input id="volume-slider" class="input-range" orient="vertical" type="range" step="1" value="25" min="1" max="100">
 </div>
-</center>
 <br>
 <button id="mute_button">Mute</button><br>
+</center>
 </td>
 <td>
 <center>
-<button id="receiver_power">A/V System On</button><br>
-<button id="video_power">Video Monitors On</button><br>
+<button id="receiver_power_button">A/V System On</button><br>
+<button id="video_power_button">Video Monitors On</button><br>
 <hr>
 <button id="mode_fm_button">FM Radio</button><br>
 <button id="mode_cast_button">ChromeCast Video</button><br>
@@ -38,6 +40,11 @@
 
 var volume_slider = $('#volume-slider');
 var mute_button = $("#mute_button");
+var receiver_power_button = $("#receiver_power_button");
+var mode_fm_button = $("#mode_fm_button");
+var mode_cast_button = $("#mode_cast_button");
+var mode_castaudio_button = $("#mode_castaudio_button");
+var mode_table_button = $("#mode_table_button");
 
 function set_volume_slider(volume)
 {
@@ -46,11 +53,36 @@ function set_volume_slider(volume)
 
 function set_mute_button(is_muted)
 {
+    // The button requests the opposite of the current state 
     mute_button.html(is_muted ? "Unmute" : "Mute");
-    if(is_muted)
+    if(is_muted) {
         volume_slider.attr("disabled", "disabled");
-    else
+    } else {
         volume_slider.removeAttr("disabled");
+    }
+}
+
+function set_receiver_power_button(is_powered)
+{
+    // The button requests the opposite of the current state 
+    receiver_power_button.html(is_powered ? "A/V System Off" : "A/V System On");
+
+    if(is_powered) {
+
+        volume_slider.removeAttr("disabled");
+        mode_fm_button.removeAttr("disabled");
+        mode_cast_button.removeAttr("disabled");
+        mode_castaudio_button.removeAttr("disabled");
+        mode_table_button.removeAttr("disabled");
+
+    } else {
+
+        volume_slider.attr("disabled", "disabled");
+        mode_fm_button.attr("disabled", "disabled");
+        mode_cast_button.attr("disabled", "disabled");
+        mode_castaudio_button.attr("disabled", "disabled");
+        mode_table_button.attr("disabled", "disabled");
+    }
 }
 
 function set_interface_from_status(status)
@@ -59,6 +91,9 @@ function set_interface_from_status(status)
 
     var is_muted = !(status['muting'] === 'off');
     set_mute_button(is_muted)
+
+    var is_receiver_powered = (status['receiver_power'] === 'on');
+    set_receiver_power_button(is_receiver_powered)
 }
 
 function set_param(thing, value)
@@ -113,6 +148,14 @@ mute_button.on('click', function(){
     console.log("set muting " + want_muting);
     set_param('muting', want_muting ? "on" : "off")
     set_mute_button(want_muting);
+});
+
+receiver_power_button.on('click', function(){
+    var is_powered = !(receiver_power_button.html() === "A/V System On");
+    var want_power = !is_powered
+    console.log("set A/V power " + want_power);
+    set_param('receiver_power', want_power ? "on" : "off")
+    set_receiver_power_button(want_power);
 });
 
 var startup_status_json = '{{ startup_status|safe }}';

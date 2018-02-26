@@ -8,6 +8,7 @@ import subprocess
 import socket
 import errno
 import eiscp
+import time
 
 logfilename = os.environ.get('LOG_NAME', "log.txt")
 logfile = open(logfilename, "w", 0)
@@ -17,6 +18,7 @@ schedule_lock = threading.Lock()
 eiscp_lock = threading.Lock()
 
 power_to_bool = {
+    "standby,off" : False,
     "off" : False,
     "on" : True,
 }
@@ -37,16 +39,13 @@ mode_id_to_string = {}
 for (name, id) in mode_string_to_id.iteritems():
     mode_id_to_string[id] = name
 
-# XXX mockup
-current_mode = 2; # XXX mockup
-current_receiver_power = True;
-current_muting = False; # XXX special value overrides volume...?
+current_mode = 2 # XXX mockup
+current_video_power = True # XXX mockup
 
 # These are the Onkyo numbers on the display that correspond to min and max.
 receiver_volume_min = 0
 receiver_volume_max = 50
 receiver_volume_range = receiver_volume_max - receiver_volume_min
-
 
 # populate current state from A/V receiver
 receiver = eiscp.eISCP("192.168.1.151")
@@ -57,14 +56,14 @@ def get_receiver_state():
     global current_volume
     global current_muting
     global current_mode
+
     with eiscp_lock:
         system_power_query = receiver.command("system-power=query")
-    current_video_power = (system_power_query[1] == 'on')
-    with eiscp_lock:
         audio_muting_query = receiver.command("audio-muting=query")
-    current_muting = (audio_muting_query[1] == 'on')
-    with eiscp_lock:
         system_volume_query = receiver.command("volume=query")
+
+    current_receiver_power = (system_power_query[1] == 'on')
+    current_muting = (audio_muting_query[1] == 'on')
     current_volume = (system_volume_query[1] - receiver_volume_min) * 100 / receiver_volume_range
 
 get_receiver_state()
@@ -76,17 +75,27 @@ def send_volume():
     global send_volume_scheduled
     with schedule_lock:
         volume = current_volume * receiver_volume_range / 100 + receiver_volume_min
-        print "actually sent volume %d " % current_volume
+        command = "volume=%d" % volume
+        print command
         with eiscp_lock:
-            receiver.command("volume=%d" % volume)
+            receiver.command(command)
         send_volume_scheduled = False
+
+def set_receiver_power(value):
+    global current_receiver_power
+    current_receiver_power = value
+    command = "system-power=%s" % bool_to_power[value]
+    print command
+    with eiscp_lock:
+        receiver.command(command)
 
 def set_muting(value):
     global current_muting
     current_muting = value
-    print "audio-muting=%s" % bool_to_power[value]
+    command = "audio-muting=%s" % bool_to_power[value]
+    print command
     with eiscp_lock:
-        receiver.command("audio-muting=%s" % bool_to_power[value])
+        receiver.command(command)
 
 def set_volume(value):
     global current_volume
@@ -95,9 +104,9 @@ def set_volume(value):
     with schedule_lock:
         current_volume = value
         if not send_volume_scheduled:
-            send_volume_scheduled = True
-            t = threading.Timer(0.1, send_volume)
+            t = threading.Timer(.1, send_volume)
             t.start()
+            send_volume_scheduled = True
     
 def get_current_status():
     get_receiver_state()
@@ -202,19 +211,17 @@ def set_value(what):
 
     if what == 'volume':
         set_volume(int(value))
-        # set volume and verify it on receiver
     elif what == 'muting':
         set_muting(power_to_bool[value])
-        # XXX set muting, scheduled?
     elif what == 'video_power':
-        current_video_power = power_to_bool[value]
-        # XXX set video power, scheduled?
+        # XXX set video power
+        pass
     elif what == 'receiver_power':
-        current_receiver_power = power_to_bool[value]
-        # XXX set receiver power, scheduled?
+        set_receiver_power(power_to_bool[value])
     elif what == 'mode':
-        current_mode = mode_string_to_id[value]
-        # XXX set video power, scheduled?
+        pass
+        # current_mode = mode_string_to_id[value]
+        # XXX set mode
     else:
         fail(400, WARNING, "unknown thing " + what + " in set value")
 
