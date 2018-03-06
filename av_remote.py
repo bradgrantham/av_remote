@@ -14,6 +14,46 @@ logfilename = os.environ.get('LOG_NAME', "log.txt")
 logfile = open(logfilename, "w", 0)
 loglock = threading.Lock()
 
+#############################################################################
+# datetime utility
+
+def tosql(dt):
+    return dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+
+def get_time_string(add_seconds = 0):
+    return tosql(datetime.datetime.utcnow() + datetime.timedelta(seconds = add_seconds))
+
+
+#############################################################################
+# log/debugging utility
+
+ERROR=1
+WARNING=2
+INFO=3
+DEBUG=4
+VERBOSE=5
+
+severity_clamp = int(os.environ.get('LOG_LEVEL', str(WARNING)))
+
+def get_caller_info(stack):
+    sequence = stack[-2][2] + ":" + str(stack[-2][1])
+    while len(stack) > 2 and stack[-3][2] != 'dispatch_request':
+        sequence = stack[-3][2] + ":" + str(stack[-3][1]) + "|" + sequence
+        del stack[-3]
+    return sequence
+
+
+def log(severity, what):
+    datetime = get_time_string()
+    if severity <= severity_clamp:
+        with loglock:
+            print >>logfile, '"%s", "%s", %d, "%s"' % (get_time_string(), get_caller_info(traceback.extract_stack()), severity, what)
+
+
+#############################################################################
+# A/V receiver control logic
+
 schedule_lock = threading.Lock()
 eiscp_lock = threading.Lock()
 
@@ -22,9 +62,15 @@ power_to_bool = {
     "off" : False,
     "on" : True,
 }
+
 bool_to_power = {
     False: "off",
     True: "on",
+}
+
+receiver_audio_to_id = {
+    "analog" : 0,
+    "hdmi" : 1,
 }
 
 receiver_input_to_id = {
@@ -45,13 +91,17 @@ mode_string_to_id = {
 }
 
 mode_id_to_string = {}
-mode_id_to_receiver_input = {}
 
 for (name, id) in mode_string_to_id.iteritems():
     mode_id_to_string[id] = name
 
+mode_id_to_receiver_input = {}
 for (input, id) in receiver_input_to_id.iteritems():
     mode_id_to_receiver_input[id] = input
+
+mode_id_to_receiver_audio = {}
+for (audio, id) in receiver_audio_to_id.iteritems():
+    mode_id_to_receiver_audio[id] = audio
 
 current_video_power = True # XXX mockup
 
@@ -64,6 +114,7 @@ receiver_volume_range = receiver_volume_max - receiver_volume_min
 receiver = eiscp.eISCP("192.168.1.151")
 
 def get_receiver_state():
+    global current_audio
     global current_video_power
     global current_receiver_power
     global current_volume
@@ -75,15 +126,26 @@ def get_receiver_state():
         audio_muting_query = receiver.command("audio-muting=query")
         system_volume_query = receiver.command("volume=query")
         input_selector_query = receiver.command("input-selector=query")
+        audio_selector_query = receiver.command("audio-selector=query")
 
     current_receiver_power = (system_power_query[1] == 'on')
+
     current_muting = (audio_muting_query[1] == 'on')
+
     if isinstance(input_selector_query[1], tuple):
         input_selector_string = ",".join(input_selector_query[1])
     else:
         input_selector_string = input_selector_query[1]
-    current_mode = receiver_input_to_id.get(input_selector_string, 5)
+    current_mode = receiver_input_to_id.get(input_selector_string, len(receiver_input_to_id))
+
     current_volume = (system_volume_query[1] - receiver_volume_min) * 100 / receiver_volume_range
+
+    if isinstance(audio_selector_query[1], tuple):
+        audio_selector_string = ",".join(audio_selector_query[1])
+    else:
+        audio_selector_string = audio_selector_query[1]
+    current_audio = receiver_audio_to_id.get(audio_selector_string, len(receiver_audio_to_id))
+    log(INFO, "audio_selector_string = %s, current_audio = %d" % (audio_selector_string, current_audio))
 
 get_receiver_state()
 
@@ -100,13 +162,27 @@ def send_volume():
             receiver.command(command)
         send_volume_scheduled = False
 
-def set_receiver_input(id):
-    global current_mode
-    current_mode = id
-    command = "input-selector=%s" % mode_id_to_receiver_input[id]
+def set_receiver_audio(id):
+    global current_audio
+    current_audio = id
+    command = "audio-selector=%s" % mode_id_to_receiver_audio[id]
     print command
     with eiscp_lock:
         receiver.command(command)
+    log(INFO, "set_receiver_audio %d" % (current_audio))
+    log(INFO, "set_receiver_audio command %s" % (command))
+
+def set_receiver_input(id):
+    global current_mode
+    global current_audio
+    current_mode = id
+    input_command = "input-selector=%s" % mode_id_to_receiver_input[id]
+    print input_command
+    audio_command = "audio-selector=%s" % mode_id_to_receiver_audio[current_audio]
+    print audio_command
+    with eiscp_lock:
+        receiver.command(input_command)
+        receiver.command(audio_command)
 
 def set_receiver_power(value):
     global current_receiver_power
@@ -143,45 +219,10 @@ def get_current_status():
         "receiver_power" : bool_to_power[current_receiver_power],
         "muting" : bool_to_power[current_muting],
         "mode" : mode_id_to_string[current_mode],
+        "replace_audio" : bool_to_power[current_audio == 0],
     }
+    log(INFO, "current audio %d, string %s" % (current_audio, bool_to_power[current_audio == 0]))
     return status
-
-
-#############################################################################
-# datetime utility
-
-def tosql(dt):
-    return dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-
-
-def get_time_string(add_seconds = 0):
-    return tosql(datetime.datetime.utcnow() + datetime.timedelta(seconds = add_seconds))
-
-
-#############################################################################
-# log/debugging utility
-
-ERROR=1
-WARNING=2
-INFO=3
-DEBUG=4
-VERBOSE=5
-
-severity_clamp = int(os.environ.get('LOG_LEVEL', str(WARNING)))
-
-def get_caller_info(stack):
-    sequence = stack[-2][2] + ":" + str(stack[-2][1])
-    while len(stack) > 2 and stack[-3][2] != 'dispatch_request':
-        sequence = stack[-3][2] + ":" + str(stack[-3][1]) + "|" + sequence
-        del stack[-3]
-    return sequence
-
-
-def log(severity, what):
-    datetime = get_time_string()
-    if severity <= severity_clamp:
-        with loglock:
-            print >>logfile, '"%s", "%s", %d, "%s"' % (get_time_string(), get_caller_info(traceback.extract_stack()), severity, what)
 
 
 #############################################################################
@@ -250,6 +291,14 @@ def set_value(what):
             fail(400, WARNING, "unknown input mode " + value + " in set value")
         else:
             set_receiver_input(mode_string_to_id[value])
+    elif what == 'replace_audio':
+        if value not in ("on", "off"):
+            fail(400, WARNING, "unknown audio replace setting " + value + " in set value")
+        else:
+	    audio = receiver_audio_to_id["hdmi"]
+	    if value == "on":
+		audio = receiver_audio_to_id["analog"]
+            set_receiver_audio(audio)
     else:
         fail(400, WARNING, "unknown thing " + what + " in set value")
 
