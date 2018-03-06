@@ -1,8 +1,12 @@
 To shutdown server (otherwise threads persist):
     curl -d '{}' -H "Content-Type: application/json" -X POST http://localhost:5060/shutdown
 
-More responsive volume control
-analog audio input versus HDMI audio
+Handle connection dropped
+More responsive volume control in Javascript
+    10msec updates while dragging
+    immediate update on release
+More responsive volume control in Python
+    queue - drained every 10msec?
 how can I make everything more responsive?
 input selectors - button?
 install on Penguin or RPi
