@@ -1,12 +1,29 @@
 To shutdown server (otherwise threads persist):
     curl -d '{}' -H "Content-Type: application/json" -X POST http://localhost:5060/shutdown
 
+More responsive volume control in Python
+    separate receiver control thread
+    HTTP inserts commands into queue
+    control thread drains command queue every 100msec
+        collapsing command types: volume, mode, on/off, mute, chromecast audio
+        all volume requests to 1 request
+	immediately update receiver status after queue drain
+	otherwise updates queue every 2 seconds
 Handle connection dropped
 More responsive volume control in Javascript
-    10msec updates while dragging
-    immediate update on release
-More responsive volume control in Python
-    queue - drained every 10msec?
+    100msec updates while dragging, send most recent
+    if(get_updates) { update status every 2 seconds }
+    set interval timer on click
+        dragging_volume = true
+	get_updates = false
+    in interval timer:
+	send current volume
+	set interval timer
+    on release
+	delete interval timer
+	send current volume
+	dragging_volume = false
+	get_updates = true
 how can I make everything more responsive?
 input selectors - button?
 install on Penguin or RPi
