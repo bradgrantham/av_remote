@@ -151,8 +151,12 @@ function set_interface_from_status(status)
     set_disabled(status['mode']);
 }
 
+var status_sequence = 0;
+
 function set_param(thing, value)
 {
+    status_sequence += 1;
+    var s = status_sequence;
     $.ajax({
         type:"PUT",
         beforeSend: function (request)
@@ -165,15 +169,18 @@ function set_param(thing, value)
         data: JSON.stringify({'value': value}),
         processData: false,
         success: function(data, status, xhr) {
-            var av_status = JSON.parse(data);
-
-            set_interface_from_status(av_status);
+	    if(status_sequence == s) {
+		var av_status = JSON.parse(data);
+		set_interface_from_status(av_status);
+	    }
         }
     });
 }
 
 function update_status()
 {
+    status_sequence += 1;
+    var s = status_sequence;
     $.ajax({
         type:"GET",
         beforeSend: function (request)
@@ -185,9 +192,10 @@ function update_status()
         url: /* APP.event_base_url + */ "status",
         processData: false,
         success: function(data, status, xhr) {
-            var av_status = JSON.parse(data);
-
-            set_interface_from_status(av_status);
+	    if(status_sequence == s) {
+		var av_status = JSON.parse(data);
+		set_interface_from_status(av_status);
+	    }
         }
     });
 }
