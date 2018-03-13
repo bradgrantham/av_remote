@@ -121,6 +121,8 @@ receiver_volume_min = 0
 receiver_volume_max = 50
 receiver_volume_range = receiver_volume_max - receiver_volume_min
 
+receiver_loop_length_seconds = 1
+
 def get_receiver_state():
     global current_audio
     global current_video_power
@@ -129,6 +131,7 @@ def get_receiver_state():
     global current_muting
     global current_mode
     global main_lock
+    global receiver
 
     with main_lock:
         system_power_query = receiver.command("system-power=query")
@@ -156,23 +159,12 @@ def get_receiver_state():
     current_audio = receiver_audio_to_id.get(audio_selector_string, len(receiver_audio_to_id))
     log(INFO, "audio_selector_string = %s, current_audio = %d" % (audio_selector_string, current_audio))
 
-def send_volume():
-    global current_volume
-    global send_volume_scheduled
-    with main_lock:
-        volume = current_volume * receiver_volume_range / 100 + receiver_volume_min
-        command = "volume=%d" % volume
-        print command
-	receiver.command(command)
-        send_volume_scheduled = False
-
 def set_receiver_audio(id):
     global current_audio
     current_audio = id
     command = "audio-selector=%s" % mode_id_to_receiver_audio[id]
     print command
-    with main_lock:
-        receiver.command(command)
+    receiver.command(command)
     log(INFO, "set_receiver_audio %d" % (current_audio))
     log(INFO, "set_receiver_audio command %s" % (command))
 
@@ -184,37 +176,37 @@ def set_receiver_input(id):
     print input_command
     audio_command = "audio-selector=%s" % mode_id_to_receiver_audio[current_audio]
     print audio_command
-    with main_lock:
-        receiver.command(input_command)
-        receiver.command(audio_command)
+    receiver.command(input_command)
+    receiver.command(audio_command)
 
 def set_receiver_power(value):
     global current_receiver_power
     current_receiver_power = value
     command = "system-power=%s" % bool_to_power[value]
     print command
-    with main_lock:
-        receiver.command(command)
+    receiver.command(command)
 
 def set_muting(value):
     global current_muting
     current_muting = value
     command = "audio-muting=%s" % bool_to_power[value]
     print command
+    receiver.command(command)
+
+def add_request(what, value):
+    global requests
     with main_lock:
-        receiver.command(command)
+        requests[what] = value
 
 def set_volume(value):
     global current_volume
-    global send_volume_scheduled
-    print "set volume to %d and requested send" % value
-    with main_lock:
-        current_volume = value
-        if not send_volume_scheduled:
-            t = threading.Timer(.1, send_volume)
-            t.start()
-            send_volume_scheduled = True
-    
+    print "set volume to %d" % value
+    current_volume = value
+    volume = current_volume * receiver_volume_range / 100 + receiver_volume_min
+    command = "volume=%d" % volume
+    print command
+    receiver.command(command)
+
 def get_current_status():
     get_receiver_state()
     status = {
@@ -232,15 +224,35 @@ def receiver_worker():
     global receiver_thread_stop
     global receiver_status
     global receiver
+    global requests
+    global receiver_loop_length_seconds
+
     receiver = eiscp.eISCP("192.168.1.151")
     log(INFO, "receiver worker")
+
     while not receiver_thread_stop:
-	log(INFO, "receiver worker loop")
+	
+	with main_lock:
+	    actions = requests
+	    requests = {}
+
+	if 'volume' in actions:
+	    set_volume(actions['volume'])
+	if 'muting' in actions:
+	    set_muting(actions['muting'])
+	if 'receiver_input' in actions:
+	    set_receiver_input(actions['receiver_input'])
+	if 'receiver_power' in actions:
+	    set_receiver_power(actions['receiver_power'])
+	if 'receiver_audio' in actions:
+	    set_receiver_audio(actions['receiver_audio'])
+
 	s = get_current_status()
 	with main_lock:
 	    receiver_status = s
-	# drain queue
-	time.sleep(2)
+
+	time.sleep(receiver_loop_length_seconds)
+
     receiver.disconnect()
 
 #############################################################################
@@ -298,27 +310,31 @@ def set_value(what):
     value = set_info['value']
 
     if what == 'volume':
-        set_volume(int(value))
+        add_request(what, int(value))
     elif what == 'muting':
-        set_muting(power_to_bool[value])
+        add_request(what, power_to_bool[value])
     elif what == 'video_power':
         # XXX set video power
         pass
     elif what == 'receiver_power':
-        set_receiver_power(power_to_bool[value])
+        add_request(what, power_to_bool[value])
     elif what == 'mode':
         if value not in mode_string_to_id:
             fail(400, WARNING, "unknown input mode " + value + " in set value")
         else:
-            set_receiver_input(mode_string_to_id[value])
+	    # XXX I'm comfortable with REST "what" not being the same
+	    # as the "what" passed on.  Maybe it's okay.
+            add_request('receiver_input', mode_string_to_id[value])
     elif what == 'replace_audio':
         if value not in ("on", "off"):
             fail(400, WARNING, "unknown audio replace setting " + value + " in set value")
         else:
+	    # XXX I'm comfortable with this little bit of application logic in here,
+	    # should be in receiver_worker, probably.
 	    audio = receiver_audio_to_id["hdmi"]
 	    if value == "on":
 		audio = receiver_audio_to_id["analog"]
-            set_receiver_audio(audio)
+            add_request('receiver_audio', audio)
     else:
         fail(400, WARNING, "unknown thing " + what + " in set value")
 
@@ -348,10 +364,17 @@ if __name__ == "__main__":
     main_lock = threading.Lock()
     send_volume_scheduled = False
 
+    requests = {}
+
+    receiver_status = None
+
     receiver_thread_stop = False
     print "start thread"
     receiver_thread = threading.Thread(target = receiver_worker)
     receiver_thread.start()
+
+    while not receiver_status:
+	pass
 
     port = 5066
 
