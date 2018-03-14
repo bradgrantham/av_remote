@@ -133,12 +133,11 @@ def get_receiver_state():
     global main_lock
     global receiver
 
-    with main_lock:
-        system_power_query = receiver.command("system-power=query")
-        audio_muting_query = receiver.command("audio-muting=query")
-        system_volume_query = receiver.command("volume=query")
-        input_selector_query = receiver.command("input-selector=query")
-        audio_selector_query = receiver.command("audio-selector=query")
+    system_power_query = receiver.command("system-power=query")
+    audio_muting_query = receiver.command("audio-muting=query")
+    system_volume_query = receiver.command("volume=query")
+    input_selector_query = receiver.command("input-selector=query")
+    audio_selector_query = receiver.command("audio-selector=query")
 
     current_receiver_power = (system_power_query[1] == 'on')
 
@@ -195,8 +194,10 @@ def set_muting(value):
 
 def add_request(what, value):
     global requests
-    with main_lock:
-        requests[what] = value
+    requests_available.acquire()
+    requests[what] = value
+    requests_available.notify()
+    requests_available.release()
 
 def set_volume(value):
     global current_volume
@@ -232,26 +233,31 @@ def receiver_worker():
 
     while not receiver_thread_stop:
 	
-	with main_lock:
-	    actions = requests
-	    requests = {}
+	log(INFO, "receiver acquire")
+	requests_available.acquire()
+	log(INFO, "receiver acquired")
 
-	if 'volume' in actions:
-	    set_volume(actions['volume'])
-	if 'muting' in actions:
-	    set_muting(actions['muting'])
-	if 'receiver_input' in actions:
-	    set_receiver_input(actions['receiver_input'])
-	if 'receiver_power' in actions:
-	    set_receiver_power(actions['receiver_power'])
-	if 'receiver_audio' in actions:
-	    set_receiver_audio(actions['receiver_audio'])
+	if not requests:
+	    requests_available.wait(2)
 
-	s = get_current_status()
-	with main_lock:
-	    receiver_status = s
+	actions = requests
+	requests = {}
 
-	time.sleep(receiver_loop_length_seconds)
+	requests_available.release()
+
+        if actions:
+	    if 'volume' in actions:
+		set_volume(actions['volume'])
+	    if 'muting' in actions:
+		set_muting(actions['muting'])
+	    if 'receiver_input' in actions:
+		set_receiver_input(actions['receiver_input'])
+	    if 'receiver_power' in actions:
+		set_receiver_power(actions['receiver_power'])
+	    if 'receiver_audio' in actions:
+		set_receiver_audio(actions['receiver_audio'])
+
+	receiver_status = get_current_status()
 
     receiver.disconnect()
 
@@ -285,9 +291,7 @@ def root():
 def get_status():
     log(INFO, "GET status")
 
-    with main_lock:
-	s = receiver_status
-    return json.dumps(s)
+    return json.dumps(receiver_status)
 
 
 @app.route("/set/<what>", methods=['PUT'])
@@ -362,6 +366,7 @@ def shutdown():
 if __name__ == "__main__":
 
     main_lock = threading.Lock()
+    requests_available = threading.Condition(main_lock)
     send_volume_scheduled = False
 
     requests = {}
