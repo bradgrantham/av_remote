@@ -80,10 +80,6 @@ function set_disabled(input_mode)
 
 	replace_audio_checkbox.removeAttr("disabled")
 
-// "ChromeCast Video" : 1,
-// "Table HDMI" : 2,
-// "FM Radio" : 3,
-// "Bluetooth" : 4,
 	if(input_mode == "ChromeCast Video") {
             mode_castvideo_button.attr("disabled", "disabled");
 	    replace_audio_checkbox.removeAttr("disabled");
@@ -127,7 +123,6 @@ function set_receiver_power_button(is_powered)
 
 function set_replace_audio_checkbox(is_replaced)
 {
-    console.log("audio is replaced " + is_replaced)
     if(is_replaced)
         replace_audio_checkbox.attr("checked", "checked");
     else
@@ -147,7 +142,6 @@ function set_interface_from_status(status)
     var audio_is_replaced = (status['replace_audio'] === 'on');
     set_replace_audio_checkbox(audio_is_replaced)
 
-    console.log(status['mode']);
     set_disabled(status['mode']);
 }
 
@@ -161,7 +155,6 @@ function set_param(thing, value)
         type:"PUT",
         beforeSend: function (request)
         {
-            //request.setRequestHeader("Authority", authorizationToken);
             request.setRequestHeader("Content-type","application/json");
             request.setRequestHeader("Accept","application/json");
         },
@@ -185,7 +178,6 @@ function update_status()
         type:"GET",
         beforeSend: function (request)
         {
-            //request.setRequestHeader("Authority", authorizationToken);
             request.setRequestHeader("Content-type","application/json");
             request.setRequestHeader("Accept","application/json");
         },
@@ -201,14 +193,12 @@ function update_status()
 }
     
 volume_slider.on('input', function(){
-    console.log("set volume " + this.value);
     set_param('volume', this.value);
 });
 
 mute_button.on('click', function(){
     var is_muted = !(mute_button.html() === "Mute");
     var want_muting = !is_muted
-    console.log("set muting " + want_muting);
     set_param('muting', want_muting ? "on" : "off")
     set_mute_button(want_muting);
 });
@@ -216,12 +206,10 @@ mute_button.on('click', function(){
 receiver_power_button.on('click', function(){
     var is_powered = (receiver_power_button.html() === "A/V System Off");
     var want_power = !is_powered
-    console.log("set A/V power " + want_power);
     set_param('receiver_power', want_power ? "on" : "off")
     set_receiver_power_button(want_power);
 });
 
-// "ChromeCast Audio" : 0,
 // "ChromeCast Video" : 1,
 // "Table HDMI" : 2,
 // "FM Radio" : 3,
@@ -233,28 +221,24 @@ receiver_power_button.on('click', function(){
 
 mode_fm_button.on('click', function(){
     var s = "FM Radio";
-    console.log("set mode " + s);
     set_param('mode', s);
     set_disabled(s);
 });
 
 mode_bluetooth_button.on('click', function(){
     var s = "Bluetooth";
-    console.log("set mode " + s);
     set_param('mode', s);
     set_disabled(s);
 });
 
 mode_table_button.on('click', function(){
     var s = "Table HDMI";
-    console.log("set mode " + s);
     set_param('mode', s);
     set_disabled(s);
 });
 
 mode_castvideo_button.on('click', function(){
     var s = 'ChromeCast Video';
-    console.log("set mode " + s);
     set_param('mode', s)
     set_disabled(s)
 });
@@ -262,7 +246,6 @@ mode_castvideo_button.on('click', function(){
 replace_audio_checkbox.on('click', function(){
     var enabled = replace_audio_checkbox[0].checked;
     var s = 'ChromeCast Audio';
-    console.log("set mode " + s + " " + enabled + " " + (enabled ? "enabled" : "disabled"));
     set_param('replace_audio', (enabled ? "on" : "off"))
     set_disabled(s)
 });
