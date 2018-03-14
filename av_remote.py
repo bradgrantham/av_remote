@@ -10,6 +10,20 @@ import errno
 import eiscp
 import time
 
+#############################################################################
+# HTTP half
+#     * serves REST
+#     * adds PUTs to request queue
+#     * sends status in response to GETs
+# Receiver half
+#     * reads queue and sends commands to Onkyo Receiver
+#     * reads Onkyo status and sets global status
+# Conversion between REST site-specific requests and Onkyo general Receiver requests is
+# performed by Receiver half.
+
+
+# App runtime configuration
+
 logfilename = os.environ.get('LOG_NAME', "log.txt")
 logfile = open(logfilename, "w", 0)
 loglock = threading.Lock()
@@ -53,9 +67,6 @@ def log(severity, what):
 
 #############################################################################
 # A/V receiver control logic
-
-schedule_lock = threading.Lock()
-eiscp_lock = threading.Lock()
 
 power_to_bool = {
     "standby,off" : False,
@@ -110,8 +121,7 @@ receiver_volume_min = 0
 receiver_volume_max = 50
 receiver_volume_range = receiver_volume_max - receiver_volume_min
 
-# populate current state from A/V receiver
-receiver = eiscp.eISCP("192.168.1.151")
+receiver_loop_length_seconds = 1
 
 def get_receiver_state():
     global current_audio
@@ -120,8 +130,10 @@ def get_receiver_state():
     global current_volume
     global current_muting
     global current_mode
+    global main_lock
+    global receiver
 
-    with eiscp_lock:
+    with main_lock:
         system_power_query = receiver.command("system-power=query")
         audio_muting_query = receiver.command("audio-muting=query")
         system_volume_query = receiver.command("volume=query")
@@ -147,28 +159,12 @@ def get_receiver_state():
     current_audio = receiver_audio_to_id.get(audio_selector_string, len(receiver_audio_to_id))
     log(INFO, "audio_selector_string = %s, current_audio = %d" % (audio_selector_string, current_audio))
 
-get_receiver_state()
-
-send_volume_scheduled = False
-
-def send_volume():
-    global current_volume
-    global send_volume_scheduled
-    with schedule_lock:
-        volume = current_volume * receiver_volume_range / 100 + receiver_volume_min
-        command = "volume=%d" % volume
-        print command
-        with eiscp_lock:
-            receiver.command(command)
-        send_volume_scheduled = False
-
 def set_receiver_audio(id):
     global current_audio
     current_audio = id
     command = "audio-selector=%s" % mode_id_to_receiver_audio[id]
     print command
-    with eiscp_lock:
-        receiver.command(command)
+    receiver.command(command)
     log(INFO, "set_receiver_audio %d" % (current_audio))
     log(INFO, "set_receiver_audio command %s" % (command))
 
@@ -180,37 +176,37 @@ def set_receiver_input(id):
     print input_command
     audio_command = "audio-selector=%s" % mode_id_to_receiver_audio[current_audio]
     print audio_command
-    with eiscp_lock:
-        receiver.command(input_command)
-        receiver.command(audio_command)
+    receiver.command(input_command)
+    receiver.command(audio_command)
 
 def set_receiver_power(value):
     global current_receiver_power
     current_receiver_power = value
     command = "system-power=%s" % bool_to_power[value]
     print command
-    with eiscp_lock:
-        receiver.command(command)
+    receiver.command(command)
 
 def set_muting(value):
     global current_muting
     current_muting = value
     command = "audio-muting=%s" % bool_to_power[value]
     print command
-    with eiscp_lock:
-        receiver.command(command)
+    receiver.command(command)
+
+def add_request(what, value):
+    global requests
+    with main_lock:
+        requests[what] = value
 
 def set_volume(value):
     global current_volume
-    global send_volume_scheduled
-    print "set volume to %d and requested send" % value
-    with schedule_lock:
-        current_volume = value
-        if not send_volume_scheduled:
-            t = threading.Timer(.1, send_volume)
-            t.start()
-            send_volume_scheduled = True
-    
+    print "set volume to %d" % value
+    current_volume = value
+    volume = current_volume * receiver_volume_range / 100 + receiver_volume_min
+    command = "volume=%d" % volume
+    print command
+    receiver.command(command)
+
 def get_current_status():
     get_receiver_state()
     status = {
@@ -224,6 +220,40 @@ def get_current_status():
     log(INFO, "current audio %d, string %s" % (current_audio, bool_to_power[current_audio == 0]))
     return status
 
+def receiver_worker():
+    global receiver_thread_stop
+    global receiver_status
+    global receiver
+    global requests
+    global receiver_loop_length_seconds
+
+    receiver = eiscp.eISCP("192.168.1.151")
+    log(INFO, "receiver worker")
+
+    while not receiver_thread_stop:
+	
+	with main_lock:
+	    actions = requests
+	    requests = {}
+
+	if 'volume' in actions:
+	    set_volume(actions['volume'])
+	if 'muting' in actions:
+	    set_muting(actions['muting'])
+	if 'receiver_input' in actions:
+	    set_receiver_input(actions['receiver_input'])
+	if 'receiver_power' in actions:
+	    set_receiver_power(actions['receiver_power'])
+	if 'receiver_audio' in actions:
+	    set_receiver_audio(actions['receiver_audio'])
+
+	s = get_current_status()
+	with main_lock:
+	    receiver_status = s
+
+	time.sleep(receiver_loop_length_seconds)
+
+    receiver.disconnect()
 
 #############################################################################
 # fail using Flask path
@@ -242,7 +272,7 @@ app = flask.Flask(__name__)
 @app.route("/", methods=['GET'])
 def root():
     vars = {
-        "startup_status": json.dumps(get_current_status()),
+        "startup_status": json.dumps(receiver_status),
         # "start_url": flask.url_for('start', _external = True),
         # "test_mode" : test_mode,
         # "offline_mode" : offline_mode,
@@ -255,7 +285,9 @@ def root():
 def get_status():
     log(INFO, "GET status")
 
-    return json.dumps(get_current_status())
+    with main_lock:
+	s = receiver_status
+    return json.dumps(s)
 
 
 @app.route("/set/<what>", methods=['PUT'])
@@ -278,37 +310,43 @@ def set_value(what):
     value = set_info['value']
 
     if what == 'volume':
-        set_volume(int(value))
+        add_request(what, int(value))
     elif what == 'muting':
-        set_muting(power_to_bool[value])
+        add_request(what, power_to_bool[value])
     elif what == 'video_power':
         # XXX set video power
         pass
     elif what == 'receiver_power':
-        set_receiver_power(power_to_bool[value])
+        add_request(what, power_to_bool[value])
     elif what == 'mode':
         if value not in mode_string_to_id:
             fail(400, WARNING, "unknown input mode " + value + " in set value")
         else:
-            set_receiver_input(mode_string_to_id[value])
+	    # XXX I'm comfortable with REST "what" not being the same
+	    # as the "what" passed on.  Maybe it's okay.
+            add_request('receiver_input', mode_string_to_id[value])
     elif what == 'replace_audio':
         if value not in ("on", "off"):
             fail(400, WARNING, "unknown audio replace setting " + value + " in set value")
         else:
+	    # XXX I'm comfortable with this little bit of application logic in here,
+	    # should be in receiver_worker, probably.
 	    audio = receiver_audio_to_id["hdmi"]
 	    if value == "on":
 		audio = receiver_audio_to_id["analog"]
-            set_receiver_audio(audio)
+            add_request('receiver_audio', audio)
     else:
         fail(400, WARNING, "unknown thing " + what + " in set value")
 
-    return json.dumps(get_current_status())
+    return json.dumps(receiver_status)
 
 
 def shutdown_server():
     func = flask.request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
+    receiver_thread_stop = True
+    receiver_thread.join()
     func()
 
 
@@ -323,8 +361,32 @@ def shutdown():
 
 if __name__ == "__main__":
 
-    if ("VISIBLEIP" in os.environ):
-        app.run(debug = True, port=5066, host="0.0.0.0", threaded=True)
-    else:
-        app.run(debug = True, port=5066, threaded=True)
+    main_lock = threading.Lock()
+    send_volume_scheduled = False
 
+    requests = {}
+
+    receiver_status = None
+
+    receiver_thread_stop = False
+    print "start thread"
+    receiver_thread = threading.Thread(target = receiver_worker)
+    receiver_thread.start()
+
+    while not receiver_status:
+	pass
+
+    port = 5066
+
+    try:
+	if ("VISIBLEIP" in os.environ):
+	    app.run(debug = False, port=port, host="0.0.0.0", threaded=True)
+	else:
+	    app.run(debug = False, port=port, threaded=True)
+    # except KeyboardInterrupt:
+        # print "interrupt received, stopping"
+    finally:
+	# clean up
+	print "shutting down"
+	receiver_thread_stop = True
+	receiver_thread.join()
