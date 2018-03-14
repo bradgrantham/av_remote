@@ -15,4 +15,6 @@ Current status:
 * Isn't really interactive
 * "Chromecast Audio" checkbox doesn't reflect current status properly
 
+![UI snapshot](https://github.com/bradgrantham/av_remote/raw/master/UI.png "UI snapshot")
+
 One notable item about this remote control is that I can select the HDMI audio stream or Analog input #1 can be selected while selecting an HDMI video input.  This allows me to display a Chromecast or the table HDMI cable while playing a Chromecast Audio.  So we can cast a desktop to the screen to review code or images while casting Spotify to audio.  I can switch back to listen to the audio from the desktop, or to cast Youtube to the Chromecast.
