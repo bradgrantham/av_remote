@@ -1,14 +1,6 @@
 To shutdown server (otherwise threads persist):
     curl -d '{}' -H "Content-Type: application/json" -X POST http://localhost:5060/shutdown
 
-More responsive volume control in Python
-    separate receiver control thread
-    HTTP inserts commands into queue
-    control thread drains command queue every 100msec
-        collapsing command types: volume, mode, on/off, mute, chromecast audio
-        all volume requests to 1 request
-	immediately update receiver status after queue drain
-	otherwise updates queue every 2 seconds
 Handle connection dropped
 More responsive volume control in Javascript
     100msec updates while dragging, send most recent
