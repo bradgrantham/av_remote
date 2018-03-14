@@ -8,6 +8,10 @@ So why is the system front-to-back so laggy?
 Removed asynchrony in backend and, with discard of outdated status, is now pretty responsive in frontend.
 
 Handle connection dropped
+Mobile stylesheet
+Input selectors - LEDs next to buttons?
+Video power over RS232
+Install on Penguin or RPi
 More responsive volume control in Javascript
     100msec updates while dragging, send most recent
     if(get_updates) { update status every 2 seconds }
@@ -22,8 +26,3 @@ More responsive volume control in Javascript
 	send current volume
 	dragging_volume = false
 	get_updates = true
-how can I make everything more responsive?
-input selectors - button?
-install on Penguin or RPi
-video power over RS232
-mobile stylesheet
