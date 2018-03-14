@@ -1,6 +1,12 @@
 To shutdown server (otherwise threads persist):
     curl -d '{}' -H "Content-Type: application/json" -X POST http://localhost:5060/shutdown
 
+Updates from javascript to REST are very fast, interactive, probably better than 10Hz, more like 20Hz.
+Updates through eiscp python frontend "onkyo" are very slow, on the order of 2 Hz to 1 Hz.
+Updates through eiscp python module from within python are reasonably fast, like 5Hz to 10Hz. 
+So why is the system front-to-back so laggy?
+Removed asynchrony in backend and, with discard of outdated status, is now pretty responsive in frontend.
+
 Handle connection dropped
 More responsive volume control in Javascript
     100msec updates while dragging, send most recent
