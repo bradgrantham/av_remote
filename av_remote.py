@@ -109,14 +109,33 @@ receiver_volume_min = 0
 receiver_volume_max = 50
 receiver_volume_range = receiver_volume_max - receiver_volume_min
 
-# def receiver_command(s)
-    # global receiver
-    # tries = 1
-    # while tries <= 5:
-	# try:
-	    # receiver.command(s)
-# 
-	# finally:
+def receiver_command(s):
+    global receiver
+
+    try:
+	return receiver.command(s)
+    except:
+	# maybe Receiver power-cycled - try to open connection again
+	log(ERROR, "unexpected condition caused receiver command to fail, trying to reconnect")
+	# receiver.disconnect()
+	tries = 0
+	while tries <= 5:
+	    tries = tries + 1
+	    try:
+		receiver = eiscp.eISCP("192.168.1.151")
+                # Argh - making receiver doesn't actually connect,
+                # so send power query to connect and fail if necessary.
+		power_test = receiver.command("system-power=query")
+		if receiver and power_test:
+		    log(ERROR, "connecting to receiver succeeded, sending command")
+		    return receiver.command(s)
+	    except:
+		pass
+	    log(ERROR, "connecting to receiver failed, try number %d" % tries)
+
+    receiver = None
+    log(ERROR, "unexpected condition caused receiver command to fail repeatedly")
+    return None
 
 def get_receiver_state():
     global current_audio
@@ -128,34 +147,37 @@ def get_receiver_state():
     global eiscp_lock
     global receiver
 
-    then = time.clock()
-    with eiscp_lock:
-	system_power_query = receiver.command("system-power=query")
-	audio_muting_query = receiver.command("audio-muting=query")
-	system_volume_query = receiver.command("volume=query")
-	input_selector_query = receiver.command("input-selector=query")
-	audio_selector_query = receiver.command("audio-selector=query")
+    try:
+	then = time.clock()
+	with eiscp_lock:
+	    system_power_query = receiver_command("system-power=query")
+	    audio_muting_query = receiver_command("audio-muting=query")
+	    system_volume_query = receiver_command("volume=query")
+	    input_selector_query = receiver_command("input-selector=query")
+	    audio_selector_query = receiver_command("audio-selector=query")
 
-    current_receiver_power = (system_power_query[1] == 'on')
+	current_receiver_power = (system_power_query[1] == 'on')
 
-    current_muting = (audio_muting_query[1] == 'on')
+	current_muting = (audio_muting_query[1] == 'on')
 
-    if isinstance(input_selector_query[1], tuple):
-        input_selector_string = ",".join(input_selector_query[1])
-    else:
-        input_selector_string = input_selector_query[1]
-    current_mode = receiver_input_to_id.get(input_selector_string, len(receiver_input_to_id))
+	if isinstance(input_selector_query[1], tuple):
+	    input_selector_string = ",".join(input_selector_query[1])
+	else:
+	    input_selector_string = input_selector_query[1]
+	current_mode = receiver_input_to_id.get(input_selector_string, len(receiver_input_to_id))
 
-    current_volume = (system_volume_query[1] - receiver_volume_min) * 100 / receiver_volume_range
+	current_volume = (system_volume_query[1] - receiver_volume_min) * 100 / receiver_volume_range
 
-    if isinstance(audio_selector_query[1], tuple):
-        audio_selector_string = ",".join(audio_selector_query[1])
-    else:
-        audio_selector_string = audio_selector_query[1]
-    current_audio = receiver_audio_to_id.get(audio_selector_string, len(receiver_audio_to_id))
-    log(INFO, "audio_selector_string = %s, current_audio = %d" % (audio_selector_string, current_audio))
-    now = time.clock()
-    log(INFO, "time to get and parse state: %f" % (now - then))
+	if isinstance(audio_selector_query[1], tuple):
+	    audio_selector_string = ",".join(audio_selector_query[1])
+	else:
+	    audio_selector_string = audio_selector_query[1]
+	current_audio = receiver_audio_to_id.get(audio_selector_string, len(receiver_audio_to_id))
+	log(INFO, "audio_selector_string = %s, current_audio = %d" % (audio_selector_string, current_audio))
+	now = time.clock()
+	log(INFO, "time to get and parse state: %f" % (now - then))
+    except:
+	current_receiver_power = False
 
 def set_receiver_audio(id):
     global current_audio
@@ -164,7 +186,7 @@ def set_receiver_audio(id):
     command = "audio-selector=%s" % mode_id_to_receiver_audio[id]
     print command
     with eiscp_lock:
-        receiver.command(command)
+        receiver_command(command)
     log(INFO, "set_receiver_audio %d" % (current_audio))
     log(INFO, "set_receiver_audio command %s" % (command))
 
@@ -178,8 +200,8 @@ def set_receiver_input(id):
     audio_command = "audio-selector=%s" % mode_id_to_receiver_audio[current_audio]
     print audio_command
     with eiscp_lock:
-        receiver.command(input_command)
-	receiver.command(audio_command)
+        receiver_command(input_command)
+	receiver_command(audio_command)
 
 def set_receiver_power(value):
     global current_receiver_power
@@ -189,7 +211,7 @@ def set_receiver_power(value):
     command = "system-power=%s" % bool_to_power[value]
     print command
     with eiscp_lock:
-	receiver.command(command)
+	receiver_command(command)
 
 def set_muting(value):
     global current_muting
@@ -198,7 +220,7 @@ def set_muting(value):
     command = "audio-muting=%s" % bool_to_power[value]
     print command
     with eiscp_lock:
-	receiver.command(command)
+	receiver_command(command)
 
 def set_volume(value):
     global current_volume
@@ -209,11 +231,12 @@ def set_volume(value):
     command = "volume=%d" % volume
     print command
     with eiscp_lock:
-	receiver.command(command)
+	receiver_command(command)
 
 def get_current_status():
     get_receiver_state()
     status = {
+	"connected" : bool_to_power[(receiver is not None)],
         "volume" : current_volume,
         "muting" : bool_to_power[current_muting],
         "video_power" : bool_to_power[current_video_power],
