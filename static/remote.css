@@ -2,6 +2,9 @@
     -webkit-box-sizing: border-box;
     -moz-box-sizing: border-box;
     box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+    font-size: 100%;
+    font-weight: 400;
 }
 
 .range-slider .input-range {
@@ -14,3 +17,43 @@
     outline: none;
 }
 
+body {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+}
+
+@media only screen and (max-width: 480px){
+    body {
+        margin: 12px;
+    }
+}
+
+@media only screen and (max-width: 640px){
+    body {
+        margin: 16px;
+    }
+}
+
+@media only screen and (min-width: 641px){
+    body {
+        margin: .5in;
+    }
+}
+
+input[type='text'] {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: inherit;
+}
+
+input[type='number'] {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: inherit;
+}
+
+button {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: inherit;
+}
