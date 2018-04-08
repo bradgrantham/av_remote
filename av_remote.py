@@ -73,9 +73,8 @@ receiver_audio_to_id = {
 }
 
 receiver_input_to_id = {
-    "video2,cbl,sat" : 0,
     "dvd,bd,dvd" : 1,
-    "video3,game/tv,game,game1" : 2,
+    "video2,cbl,sat" : 2,
     "fm" : 3,
     "bluetooth" : 4,
 }
