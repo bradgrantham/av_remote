@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?><popup title="Search" align="center" type="custom" time="0" uri="resource:///popup" /> <textbox title="Enter your query" align="center" total="1" uri="resource:///popup/textbox:0" /> <input text="Touch this bar to search" value="" align="left" type="plain" uri="resource:///popup/textbox:0"/input:0" /> </textbox> <buttongroup title="" align="" total="2" uri="resource:///popup/buttongroup:0" /> <button text="Search" align="center" selected="false" uri="resource:///popup/buttongroup:0/button:0" /> <button text="Back" align="center" selected="false" uri="resource:///popup/buttongroup:0/button:1" /> </buttongroup> </popup>
+
+<?xml version="1.0" encoding="utf-8"?><popup title="" align="" type="overlay" time="3" uri="resource:///popup" /> <label title="" align="" total="1" uri="resource:///popup/label:0" /> <line text="Spotify Paused (max 1 device)" align="left" uri="resource:///popup/buttongroup:0/button:0" /> </popup>
+0000000          000ab7c2                                                
+0000003
