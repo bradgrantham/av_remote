@@ -41,7 +41,7 @@ Volume
 <button id="mode_bluetooth_button">Bluetooth</button><br>
 <hr>
 <input type="checkbox" id="replace_audio_checkbox">
-<label for=replace_audio_checkbox"><small>Chromecast Audio</small></label>
+<label for="replace_audio_checkbox"><small>Chromecast Audio</small></label>
 </center>
 </td>
 </tr>
@@ -135,7 +135,7 @@ function set_receiver_power_button(is_powered)
 function set_replace_audio_checkbox(is_replaced)
 {
     if(is_replaced)
-        replace_audio_checkbox.attr("checked", "checked");
+        replace_audio_checkbox.prop("checked", true);
     else
         replace_audio_checkbox.removeAttr("checked");
 }
@@ -254,7 +254,7 @@ mode_castvideo_button.on('click', function(){
     set_disabled(s)
 });
 
-replace_audio_checkbox.on('click', function(){
+replace_audio_checkbox.change(function(){
     var enabled = replace_audio_checkbox[0].checked;
     var s = 'ChromeCast Audio';
     set_param('replace_audio', (enabled ? "on" : "off"))
