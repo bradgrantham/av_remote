@@ -1,6 +1,7 @@
 import json
 import os
 import errno
+# sudo easy_install onkyo-eiscp
 import eiscp
 import time
 import atexit

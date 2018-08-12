@@ -7,7 +7,6 @@ import threading
 import subprocess
 import socket
 import errno
-import eiscp
 import time
 
 import rabbithole_av

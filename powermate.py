@@ -14,6 +14,7 @@ input_event_size = struct.calcsize(input_event_struct)
 EVENT_UNKNOWN = 0
 EVENT_BUTTON_PRESS = 1
 EVENT_RELATIVE_MOTION = 2
+EVENT_LED_BRIGHTNESS = 4
 RELATIVE_AXES_DIAL = 7
 BUTTON_MISC = 0x100
 
@@ -122,6 +123,10 @@ class PowerMate:
         data = struct.pack(input_event_struct, 0, 0, 0x04, 0x01, magic)
         os.write(self.handle, data)
 
+def update_led(p):
+    led = 0 if rabbithole_av.current_muting else rabbithole_av.current_volume*255/100
+    p.SetLEDState(led, 0, 0, False, False)
+
 def main():
     p = PowerMate()
 
@@ -129,8 +134,9 @@ def main():
         # print "Waiting..."
         e = p.WaitForEvent(1)
         if e is None:
-            pass
-            # print "Timeout"
+            # Timeout. Update our state.
+            rabbithole_av.get_receiver_state()
+            update_led(p)
         else:
             if e.type == EVENT_BUTTON_PRESS:
                 # Toggle mute.
@@ -147,6 +153,9 @@ def main():
                 print "Setting volume to %d" % new_value
                 rabbithole_av.set_volume(new_value)
                 print "Done setting volume"
+                update_led(p)
+            elif e.type == EVENT_LED_BRIGHTNESS:
+                print "LED brightness is %d" % e.value
             elif e.type == EVENT_UNKNOWN:
                 # Ignore.
                 pass
