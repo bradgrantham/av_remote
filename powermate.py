@@ -81,8 +81,11 @@ class PowerMate:
         except exceptions.OSError:
             return 0
 
+    def QueueIsEmpty(self):
+        return len(self.event_queue) == 0
+
     def WaitForEvent(self, timeout): # timeout in seconds
-        if len(self.event_queue) > 0:
+        if not self.QueueIsEmpty():
             return self.event_queue.pop(0)
         if self.handle < 0:
             return None
@@ -127,42 +130,60 @@ def update_led(p):
     led = 0 if rabbithole_av.current_muting else rabbithole_av.current_volume*255/100
     p.SetLEDState(led, 0, 0, False, False)
 
+def handle_volume_change(p, delta):
+    new_value = rabbithole_av.current_volume + delta
+    new_value = min(max(new_value, 0), 100)
+    print "Setting volume to %d" % new_value
+    rabbithole_av.set_volume(new_value)
+    print "Done setting volume"
+    update_led(p)
+
+def handle_event(p, e):
+    if e.type == EVENT_BUTTON_PRESS:
+        # Toggle mute.
+        if e.value:
+            new_muting = not rabbithole_av.current_muting
+            print "Setting muting to " + str(new_muting)
+            rabbithole_av.set_muting(new_muting)
+            print "Done muting"
+    elif e.type == EVENT_RELATIVE_MOTION:
+        # Change volume.
+        delta = e.value
+        handle_volume_change(p, delta)
+    elif e.type == EVENT_LED_BRIGHTNESS:
+        print "LED brightness is %d" % e.value
+    elif e.type == EVENT_UNKNOWN:
+        # Ignore.
+        pass
+    else:
+        # Unknown command.
+        print "Unknown command: " + str(e)
+
 def main():
     p = PowerMate()
 
     print "Ready."
     while True:
         # print "Waiting..."
-        e = p.WaitForEvent(1)
-        if e is None:
-            # Timeout. Update our state.
-            rabbithole_av.get_receiver_state()
-            update_led(p)
-        else:
-            if e.type == EVENT_BUTTON_PRESS:
-                # Toggle mute.
-                if e.value:
-                    new_muting = not rabbithole_av.current_muting
-                    print "Setting muting to " + str(new_muting)
-                    rabbithole_av.set_muting(new_muting)
-                    print "Done muting"
-            elif e.type == EVENT_RELATIVE_MOTION:
-                # Change volume.
-                delta = e.value
-                new_value = rabbithole_av.current_volume + delta
-                new_value = min(max(new_value, 0), 100)
-                print "Setting volume to %d" % new_value
-                rabbithole_av.set_volume(new_value)
-                print "Done setting volume"
-                update_led(p)
-            elif e.type == EVENT_LED_BRIGHTNESS:
-                print "LED brightness is %d" % e.value
-            elif e.type == EVENT_UNKNOWN:
-                # Ignore.
-                pass
+        delta = 0
+        while not p.QueueIsEmpty():
+            # Shouldn't block.
+            e = p.WaitForEvent(1)
+            if e.type == EVENT_RELATIVE_MOTION:
+                delta += e.value
             else:
-                # Unknown command.
-                print "Unknown command: " + str(e)
+                handle_event(p, e)
+
+        if delta != 0:
+            handle_volume_change(p, delta)
+        else:
+            e = p.WaitForEvent(1)
+            if e is None:
+                # Timeout. Update our state.
+                rabbithole_av.get_receiver_state()
+                update_led(p)
+            else:
+                handle_event(p, e)
 
 if __name__ == "__main__":
     main()
