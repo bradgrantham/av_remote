@@ -1,24 +1,26 @@
 
+# Control the AV system using GPIO buttons.
+
 import Queue
-import GPIO
+import RPi.GPIO as GPIO
 import rabbithole_av
 
 # How often to poll the receiver's status, in seconds.
 POLL_PERIOD_S = 1
 
 # BOARD pin numbers.
-SW1 = 3
-SW2 = 5
-SW3 = 7
-SW4 = 11
-SW5 = 13
-SW6 = 15
-LED1 = 19
-LED2 = 21
-LED3 = 23
-LED4 = 29
-LED5 = 31
-LED6 = 33
+SW1 = 7
+SW2 = 11
+SW3 = 13
+SW4 = 15
+SW5 = 19
+SW6 = 21
+LED1 = 23
+LED2 = 29
+LED3 = 31
+LED4 = 33
+LED5 = 35
+LED6 = 37
 
 # Lists for iteration.
 SW_LIST = [ SW1, SW2, SW3, SW4, SW5, SW6 ]
@@ -42,11 +44,13 @@ g_switch_event = Queue.Queue()
 
 # Update the LEDs for video output.
 def update_video_led(video_mode):
-    GPIO.output(LED_LIST[VIDEO_CHROMECAST], audio_mode == VIDEO_CHROMECAST_NAME)
-    GPIO.output(LED_LIST[VIDEO_TABLE], audio_mode == VIDEO_TABLE_NAME)
+    print "Video mode: ", video_mode
+    GPIO.output(LED_LIST[VIDEO_CHROMECAST], video_mode == VIDEO_CHROMECAST_NAME)
+    GPIO.output(LED_LIST[VIDEO_TABLE], video_mode == VIDEO_TABLE_NAME)
 
 # Update the LEDs for audio output.
 def update_audio_led(audio_mode):
+    print "Audio mode: ", audio_mode
     GPIO.output(LED_LIST[AUDIO_HDMI], audio_mode == AUDIO_HDMI_NAME)
     GPIO.output(LED_LIST[AUDIO_ANALOG], audio_mode == AUDIO_ANALOG_NAME)
 
@@ -86,18 +90,22 @@ def main():
 
     # Configure the LED pins.
     for led in LED_LIST:
+        print led
         GPIO.setup(led, GPIO.OUT)
 
     # Configure the switch pins.
     for sw in SW_LIST:
+        print sw
         GPIO.setup(sw, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
         # Put pin number into a queue to be picked up by the main thread.
         GPIO.add_event_detect(sw, GPIO.FALLING, callback=g_switch_event.put, bouncetime=300)
 
+    print "Ready"
     while True:
         try:
             # Wait for switch event in queue.
+            print "Polling"
             sw = g_switch_event.get(True, POLL_PERIOD_S)
             handle_switch_event(sw)
         except Queue.Empty:

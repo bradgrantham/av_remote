@@ -77,7 +77,8 @@ def send_command_to_receiver(s):
 
     try:
 	return receiver.command(s)
-    except:
+    except Exception, e:
+        print "Exception, reconnecting: " + str(e)
 	# maybe Receiver power-cycled - try to open connection again
 	log(ERROR, "unexpected condition caused receiver command to fail, trying to reconnect")
 	# receiver.disconnect()

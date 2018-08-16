@@ -130,6 +130,7 @@ def update_led(p):
 def main():
     p = PowerMate()
 
+    print "Ready."
     while True:
         # print "Waiting..."
         e = p.WaitForEvent(1)
