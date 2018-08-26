@@ -1,6 +1,7 @@
 
 # Control the AV system using GPIO buttons.
 
+import time
 import Queue
 import RPi.GPIO as GPIO
 import rabbithole_av
@@ -100,6 +101,18 @@ def main():
 
         # Put pin number into a queue to be picked up by the main thread.
         GPIO.add_event_detect(sw, GPIO.FALLING, callback=g_switch_event.put, bouncetime=300)
+
+    for l in xrange(0, 6):
+        GPIO.output(LED_LIST[l], True)
+        time.sleep(.1);
+        GPIO.output(LED_LIST[l], False)
+
+    for l in xrange(0, 6):
+        GPIO.output(LED_LIST[l], True)
+    time.sleep(.2)
+    for l in xrange(0, 6):
+        GPIO.output(LED_LIST[l], False)
+
 
     print "Ready"
     while True:
