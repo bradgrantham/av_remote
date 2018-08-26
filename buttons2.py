@@ -29,8 +29,8 @@ LED_LIST = [ LED1, LED2, LED3, LED4, LED5, LED6 ]
 # Assignments to functions. Value is index in lists above.
 VIDEO_CHROMECAST = 0
 VIDEO_TABLE = 1
-AUDIO_HDMI = 2
-AUDIO_ANALOG = 3
+AUDIO_HDMI = 3
+AUDIO_ANALOG = 4
 
 # Names in the rabbithole_av module.
 VIDEO_CHROMECAST_NAME = "ChromeCast Video"
