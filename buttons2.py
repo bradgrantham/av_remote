@@ -59,7 +59,11 @@ def update_audio_led(audio_mode):
 def update_led_state():
     rabbithole_av.get_receiver_state()
     update_video_led(rabbithole_av.mode_id_to_string[rabbithole_av.current_mode])
-    update_audio_led(rabbithole_av.mode_id_to_receiver_audio[rabbithole_av.current_audio])
+    try:
+        update_audio_led(rabbithole_av.mode_id_to_receiver_audio[rabbithole_av.current_audio])
+    except KeyError:
+        print "Current_audio not found in mode_id_to_receiver_audio: %d" % rabbithole_av.current_audio
+        return
 
 # Called on main thread when a switch is pressed. "sw" is one of the SW? values.
 def handle_switch_event(sw):
