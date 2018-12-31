@@ -24,6 +24,7 @@ bool_to_power = {
 receiver_audio_to_id = {
     "analog" : 0,
     "hdmi" : 1,
+    "coax,opt" : 2
 }
 
 receiver_input_to_id = {
@@ -31,6 +32,7 @@ receiver_input_to_id = {
     "video2,cbl,sat" : 2,
     "fm" : 3,
     "bluetooth" : 4,
+    "network,net" : 5,
 }
 
 mode_string_to_id = {
@@ -69,7 +71,7 @@ DEBUG=4
 VERBOSE=5
 
 def log(level, string):
-    if False:
+    if True:
         print level, string
 
 def send_command_to_receiver(s):
@@ -78,7 +80,8 @@ def send_command_to_receiver(s):
     try:
 	return receiver.command(s)
     except Exception, e:
-        print "Exception, reconnecting: " + str(e)
+        print "Exception, reconnecting: ", str(e)
+        print dir(e)
 	# maybe Receiver power-cycled - try to open connection again
 	log(ERROR, "unexpected condition caused receiver command to fail, trying to reconnect")
 	# receiver.disconnect()
